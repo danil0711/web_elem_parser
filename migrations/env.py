@@ -7,6 +7,7 @@ from alembic import context
 from app.infrastructure.config import settings 
 from app.infrastructure.db.base import Base
 from app.infrastructure.db.models.user import User
+from app.infrastructure.db.models.task import Task
 
 
 # Alembic config object

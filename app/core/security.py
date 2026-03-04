@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta, timezone
-from jose import jwt
+from fastapi import HTTPException, status
+from jose import JWTError, jwt
 from app.infrastructure.config import settings
 from passlib.context import CryptContext
-
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
@@ -31,3 +31,18 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Проверяем пароль через Argon2
     """
     return pwd_context.verify(plain_password, hashed_password)
+
+def verify_access_token(token: str) -> dict:
+    try:
+        payload = jwt.decode(
+            token,
+            settings.secret_key,
+            algorithms=[settings.algorithm]
+        )
+        return payload
+
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials"
+        )

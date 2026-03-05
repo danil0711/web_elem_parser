@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import relationship
@@ -18,4 +20,15 @@ class Task(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
 
+    last_run_at = Column(DateTime, nullable=True)
+
     user = relationship("User", back_populates="tasks")
+
+    def should_run(self, now: datetime | None = None) -> bool:
+        """
+        Проверяет, пора ли запускать задачу.
+        """
+        now = now or datetime.now(timezone.utc)
+        if not self.last_run_at:
+            return True
+        return (now - self.last_run_at).total_seconds() >= self.interval

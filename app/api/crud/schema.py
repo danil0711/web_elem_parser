@@ -2,7 +2,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, HttpUrl, field_serializer, model_validator
+from pydantic import BaseModel, HttpUrl, field_serializer
 from typing import Optional
 
 class TaskBase(BaseModel):
@@ -19,9 +19,10 @@ class TaskCreate(TaskBase):
 
 class TaskRead(BaseModel):
     id: int
-    user_id: UUID           # <--- был int, а в базе UUID
+    user_id: UUID           
     is_active: bool
-    created_at: datetime         # оставляем str, но конвертируем через validator
+    created_at: datetime
+    last_run_at: Optional[datetime] = None
     url: HttpUrl
     selector: str
     interval: int
@@ -34,3 +35,7 @@ class TaskRead(BaseModel):
     @field_serializer("created_at")
     def serialize_created_at(self, v: datetime, **kwargs):
         return v.isoformat()  # автоматически отдаёт строку JSON
+    
+    @field_serializer("last_run_at")
+    def serialize_last_run_at(self, v: Optional[datetime], **kwargs):
+        return v.isoformat() if v else None

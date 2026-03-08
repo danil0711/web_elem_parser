@@ -3,7 +3,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.logger import logger
-from app.reposotories.user import authenticate_user, create_user, get_user_by_email
+from app.reposotories.user import (
+    authenticate_user,
+    create_user,
+    get_user_by_email,
+    get_user_by_username,
+)
 from app.infrastructure.db.get_db import get_db
 from app.schemas.user import UserCreate, Token
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,15 +22,22 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
     logger.info(f"Register attempt: {user.email}")
 
-    existing_user = await get_user_by_email(db, user.email)
-    if existing_user:
+    existing_email = await get_user_by_email(db, user.email)
+    if existing_email:
         logger.warning(f"Register failed: email already exists ({user.email})")
         raise HTTPException(status_code=400, detail="Такой email уже зарегистрирован.")
 
+    existing_username = await get_user_by_username(db, user.username)
+    if existing_username:
+        logger.warning(f"Register failed: username already exists ({user.email})")
+        raise HTTPException(status_code=400, detail="Username уже занят.")
+
     try:
-        db_user = await create_user(db, user.email, user.password)
+        db_user = await create_user(db, user.email, user.password, user.username)
+
         access_token = create_access_token({"sub": str(db_user.id)})
         logger.info(f"User registered successfully id={db_user.id}")
+
         return {"access_token": access_token, "token_type": "bearer"}
     except Exception as e:
         logger.exception(f"Register failed due to internal error: {e}")

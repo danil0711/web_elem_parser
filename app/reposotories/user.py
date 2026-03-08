@@ -14,9 +14,11 @@ async def get_user_by_email(db: AsyncSession, email: str):
     return result.scalars().first()
 
 
-async def create_user(db: AsyncSession, email: str, password: str):
+async def create_user(db: AsyncSession, email: str, username: str, password: str):
     hashed_password = hash_password(password)
-    db_user = User(email=email, hashed_password=hashed_password)
+
+    db_user = User(username=username, email=email, hashed_password=hashed_password)
+
     db.add(db_user)
     await db.commit()
     await db.refresh(db_user)
@@ -35,8 +37,13 @@ async def authenticate_user(db: AsyncSession, email: str, password: str):
 
     return user
 
+
 async def get_user_by_id(db: AsyncSession, user_id: int) -> User | None:
-    result = await db.execute(
-        select(User).where(User.id == user_id)
-    )
+    result = await db.execute(select(User).where(User.id == user_id))
+    return result.scalars().first()
+
+
+async def get_user_by_username(db: AsyncSession, username: str):
+    result = await db.execute(select(User).where(User.username == username))
+
     return result.scalars().first()

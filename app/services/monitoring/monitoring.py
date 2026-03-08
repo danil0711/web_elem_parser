@@ -2,8 +2,8 @@ from datetime import datetime, UTC
 from app.infrastructure.db.models.task import Task
 from app.infrastructure.fetchers.async_fetcher import HttpxAsyncFetcher
 from app.services.condition.condition import ConditionEvaluator
-from app.services.parser import ParserService
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.services.parser.parser import ParserService
 
 async def run_task(db: AsyncSession, task: Task):
     fetcher = HttpxAsyncFetcher()

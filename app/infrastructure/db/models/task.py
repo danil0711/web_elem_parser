@@ -16,17 +16,22 @@ class Task(Base):
     selector = Column(String, nullable=False)
     interval = Column(Integer, default=600)  # в секундах
     condition = Column(String, nullable=True)  # условие для алерта, опционально
-    duration = Column(Integer, nullable=True)  # сколько task должна работать, в секундах
+    duration = Column(
+        Integer, nullable=True
+    )  # сколько task должна работать, в секундах
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    last_run_at = Column(DateTime, nullable=True)
+    last_run_at = Column(DateTime(timezone=True), nullable=True)
 
     user = relationship("User", back_populates="tasks")
 
     def should_run(self, now: datetime | None = None) -> bool:
         """
-        Проверяет, пора ли запускать задачу.
+        Проверяет, прошло ли interval секунд с последнего запуска задачи.
+
+        Если задача ещё ни разу не запускалась (last_run_at = None),
+        она должна выполниться сразу.
         """
         now = now or datetime.now(timezone.utc)
         if not self.last_run_at:

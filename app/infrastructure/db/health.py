@@ -14,8 +14,8 @@ async def check_db_connection() -> bool:
             await session.execute(text("SELECT 1"))
             return True
     except (OperationalError, InvalidPasswordError, CannotConnectNowError) as e:
-        logger.error(f"❌ Database connection error: {e.__class__.__name__} - {e}")
+        logger.error(f"Database connection error: {e.__class__.__name__} - {e}")
         return False
     except Exception as e:
-        logger.error(f"❌ Unexpected database error: {e}")
+        logger.error(f"Unexpected database error: {e}")
         return False

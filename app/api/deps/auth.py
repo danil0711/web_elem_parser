@@ -14,7 +14,6 @@ async def get_current_user(
     token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
 ):
     payload = verify_access_token(token)
-    print('payload', payload)
     user_id = payload.get("sub")
 
     if not user_id:

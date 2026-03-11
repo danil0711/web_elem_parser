@@ -15,10 +15,10 @@ from app.services.scheduler.scheduler import start_scheduler
 async def lifespan(app: FastAPI):
     if not await check_db_connection():
         logger.critical("Cannot connect to database. Exiting.")
-        os._exit(1)
+        raise RuntimeError("Database connection failed")
 
     logger.info("Starting scheduler")
-    start_scheduler()
+    # start_scheduler()
 
     yield
 

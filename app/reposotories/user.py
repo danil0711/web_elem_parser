@@ -25,8 +25,14 @@ async def create_user(db: AsyncSession, email: str, username: str, password: str
     return db_user
 
 
-async def authenticate_user(db: AsyncSession, email: str, password: str):
-    result = await db.execute(select(User).where(User.email == email))
+async def authenticate_user(db: AsyncSession, identifier: str, password: str):
+    if "@" in identifier:
+        stmt = select(User).where(User.email == identifier)
+    else:
+        stmt = select(User).where(User.username == identifier)
+
+    result = await db.execute(stmt)
+
     user = result.scalars().first()
 
     if not user:

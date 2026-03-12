@@ -4,6 +4,7 @@ from jose import JWTError, jwt
 from app.core.logger import logger
 from app.infrastructure.config import settings
 from passlib.context import CryptContext
+import uuid
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
@@ -34,17 +35,22 @@ def create_refresh_token(data: dict):
         days=settings.refresh_token_expire_days
     )
 
+    jti = str(uuid.uuid4())
+
     logger.debug(
         f"Creating refresh token: user_id={data.get('sub')} exp={expire.isoformat()}"
     )
 
-    to_encode.update({"exp": expire, "type": "refresh"})
+    to_encode.update({"exp": expire, "type": "refresh", "jti": jti})
 
-    return jwt.encode(
+    token = jwt.encode(
         to_encode,
         settings.secret_key,
         algorithm=settings.algorithm,
     )
+
+    return token, jti
+
 
 def verify_access_token(token: str) -> dict:
     logger.debug("Access token verification attempt")
@@ -112,4 +118,3 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Проверяем пароль через Argon2
     """
     return pwd_context.verify(plain_password, hashed_password)
-

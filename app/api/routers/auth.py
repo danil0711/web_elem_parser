@@ -3,6 +3,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.logger import logger
+from app.infrastructure.cache.redis_cache import (
+    is_refresh_token_valid,
+    revoke_refresh_token,
+    rotate_refresh_token,
+    store_refresh_token,
+)
 from app.reposotories.user import (
     authenticate_user,
     create_user,
@@ -62,8 +68,11 @@ async def login(
 
     try:
         access_token = create_access_token({"sub": str(user.id)})
-        refresh_token = create_refresh_token({"sub": str(user.id)})
-        logger.info(f"Login success: user_id={user.id}")
+        refresh_token, jti = create_refresh_token({"sub": str(user.id)})
+
+        await store_refresh_token(jti, str(user.id))
+
+        logger.success(f"Login success: user_id={user.id}")
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
@@ -72,24 +81,49 @@ async def login(
     except Exception:
         logger.exception("Unexpected error while creating access token")
         raise HTTPException(status_code=500, detail="Internal server error")
+    
+
+@router.post("/logout")
+async def logout(data: RefreshRequest):
+    payload = verify_refresh_token(data.refresh_token)
+
+    jti = payload.get("jti")
+
+    logger.debug(f'Logouting and revoking jti={jti}')
+
+    if not jti:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    await revoke_refresh_token(jti)
+
+    return {"message": "Logged out"}
 
 
 @router.post("/refresh")
 async def refresh_token(data: RefreshRequest):
-    logger.debug('token refreshing')
+    logger.debug("token refreshing")
     payload = verify_refresh_token(data.refresh_token)
 
     user_id = payload.get("sub")
+    jti = payload.get("jti")
 
-    if not user_id:
+    if not user_id or jti:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+    valid = await is_refresh_token_valid(jti)
+
+    if not valid:
+        raise HTTPException(status_code=401, detail="Refresh token revoked")
 
     new_access_token = create_access_token({"sub": user_id})
-    new_refresh_token = create_refresh_token({"sub": user_id})
+    new_refresh_token, new_jti = create_refresh_token({"sub": user_id})
+
+    await rotate_refresh_token(jti, new_jti, user_id)
 
     return {
         "access_token": new_access_token,
         "refresh_token": new_refresh_token,
         "token_type": "bearer",
     }
+
+

@@ -7,6 +7,8 @@ from app.core.logger import logger
 from app.api.routers.auth import router as auth_router
 from app.api.routers.users import router as users_router
 from app.api.routers.tasks import router as tasks_router
+from app.infrastructure.cache.redis import redis_lifespan_check
+from app.infrastructure.cache.redis import redis_client
 from app.infrastructure.db.health import check_db_connection
 from app.services.scheduler.scheduler import start_scheduler
 
@@ -16,6 +18,9 @@ async def lifespan(app: FastAPI):
     if not await check_db_connection():
         logger.critical("Cannot connect to database. Exiting.")
         raise RuntimeError("Database connection failed")
+    
+    await redis_lifespan_check()
+
 
     logger.info("Starting scheduler")
     # start_scheduler()
@@ -23,6 +28,7 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info("Application shutdown")
+    await redis_client.close()
 
 
 app = FastAPI(lifespan=lifespan)

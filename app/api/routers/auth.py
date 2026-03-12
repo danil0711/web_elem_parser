@@ -10,9 +10,13 @@ from app.reposotories.user import (
     get_user_by_username,
 )
 from app.infrastructure.db.get_db import get_db
-from app.schemas.user import UserCreate, Token
+from app.schemas.user import RefreshRequest, UserCreate, Token
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.security import create_access_token
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    verify_refresh_token,
+)
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -58,8 +62,28 @@ async def login(
 
     try:
         access_token = create_access_token({"sub": str(user.id)})
+        refresh_token = create_refresh_token({"sub": str(user.id)})
         logger.info(f"Login success: user_id={user.id}")
-        return {"access_token": access_token, "token_type": "bearer"}
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+        }
     except Exception:
         logger.exception("Unexpected error while creating access token")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/refresh")
+async def refresh_token(data: RefreshRequest):
+    logger.debug('token refreshing')
+    payload = verify_refresh_token(data.refresh_token)
+
+    user_id = payload.get("sub")
+
+    new_access_token = create_access_token({"sub": user_id})
+
+    return {
+        "access_token": new_access_token,
+        "token_type": "bearer",
+    }

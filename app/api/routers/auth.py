@@ -81,9 +81,15 @@ async def refresh_token(data: RefreshRequest):
 
     user_id = payload.get("sub")
 
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
     new_access_token = create_access_token({"sub": user_id})
+    new_refresh_token = create_refresh_token({"sub": user_id})
 
     return {
         "access_token": new_access_token,
+        "refresh_token": new_refresh_token,
         "token_type": "bearer",
     }

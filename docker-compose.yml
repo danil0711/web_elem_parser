@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+
+  backend:
+    build: .
+    container_name: web_elem_parser_backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    environment:
+      REDIS_HOST: redis_web_elem_parser
+      REDIS_PORT: 6379
+
+  redis:
+    image: redis:7
+    container_name: redis_web_elem_parser
+    restart: always
+    ports:
+      - "6379:6379"

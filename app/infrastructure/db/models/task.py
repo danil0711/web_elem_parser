@@ -1,7 +1,7 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, func
 from sqlalchemy.orm import relationship
 
 from app.infrastructure.db.base import Base
@@ -10,7 +10,7 @@ from app.infrastructure.db.base import Base
 class Task(Base):
     __tablename__ = "tasks"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     url = Column(String, nullable=False)
     selector = Column(String, nullable=False)
@@ -22,18 +22,19 @@ class Task(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    next_run_at = Column(DateTime(timezone=True), nullable=False)
+
     last_run_at = Column(DateTime(timezone=True), nullable=True)
 
     user = relationship("User", back_populates="tasks")
 
-    def should_run(self, now: datetime | None = None) -> bool:
-        """
-        Проверяет, прошло ли interval секунд с последнего запуска задачи.
+    __table_args__ = (
+        Index("idx_tasks_active_next_run", "is_active", "next_run_at"),
+    )
 
-        Если задача ещё ни разу не запускалась (last_run_at = None),
-        она должна выполниться сразу.
-        """
+
+    def schedule_next_run(self, now: datetime | None = None) -> None:
         now = now or datetime.now(timezone.utc)
-        if not self.last_run_at:
-            return True
-        return (now - self.last_run_at).total_seconds() >= self.interval
+
+        self.last_run_at = now
+        self.next_run_at = now + timedelta(seconds=self.interval)

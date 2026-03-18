@@ -10,6 +10,7 @@ from app.api.crud.task import (
     update_task,
     delete_task,
 )
+from app.core.logger import logger
 from app.infrastructure.db.get_db import get_db
 from app.api.deps.auth import get_current_user
 from app.infrastructure.db.models.user import User
@@ -28,6 +29,7 @@ async def api_create_task(
     try:
         task = await create_task(db, user_id=current_user.id, task_data=task_data)
     except FetcherError as e:
+        logger.error(f'failed create task: {e}')
         raise HTTPException(
             status_code=400,
             detail=str(e),
@@ -72,7 +74,15 @@ async def api_update_task(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
         )
-    updated_task = await update_task(db, task, updates)
+    try:
+
+        updated_task = await update_task(db, task, updates)
+    except FetcherError as e:
+        logger.error(f'failed update task: {e}')
+        raise HTTPException(
+            status_code=400,
+            detail=str(e),
+        )
     return updated_task
 
 

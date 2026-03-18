@@ -6,7 +6,6 @@ from app.core.logger import logger
 from app.infrastructure.db.models.task import Task
 from app.api.crud.schema import TaskBase, TaskCreate
 from app.infrastructure.fetchers.async_fetcher import fetcher
-from app.infrastructure.fetchers.exception import FetcherError
 from app.infrastructure.fetchers.validator import validate_url
 
 
@@ -17,11 +16,7 @@ async def create_task(db: AsyncSession, user_id: int, task_data: TaskCreate) -> 
 
     data["url"] = str(data["url"])  # конвертируем HttpUrl → str
 
-    try:
-        await validate_url(fetcher, data["url"])
-    except FetcherError as e:
-        logger.warning(f"Task validation failed: {e}")
-        raise
+    await validate_url(fetcher, data["url"])
 
     task = Task(user_id=user_id, next_run_at=datetime.now(timezone.utc), **data)
 
@@ -62,8 +57,10 @@ async def update_task(db: AsyncSession, task: Task, updates: TaskBase) -> Task:
     logger.info(f"Обновляем задачу id={task.id} с данными: {update_data}")
     if "url" in update_data:
         update_data["url"] = str(update_data["url"])
+        await validate_url(fetcher, update_data["url"])
     if "interval" in update_data:
         task.schedule_next_run()
+
     for key, value in update_data.items():
         setattr(task, key, value)
     db.add(task)

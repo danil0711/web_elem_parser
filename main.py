@@ -2,6 +2,7 @@ import os
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.core.logger import logger
 from app.api.routers.auth import router as auth_router
@@ -23,7 +24,8 @@ async def lifespan(app: FastAPI):
 
 
     logger.info("Starting scheduler")
-    # start_scheduler()
+    start_scheduler()
+
 
     yield
 
@@ -32,6 +34,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+Instrumentator().instrument(app).expose(app)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],

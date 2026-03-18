@@ -7,6 +7,7 @@ from app.infrastructure.db.models.task import Task
 from app.api.crud.schema import TaskBase, TaskCreate
 from app.infrastructure.fetchers.async_fetcher import fetcher
 from app.infrastructure.fetchers.validator import validate_url
+from app.metrics.tasks import tasks_created_total
 
 
 async def create_task(db: AsyncSession, user_id: int, task_data: TaskCreate) -> Task:
@@ -26,6 +27,7 @@ async def create_task(db: AsyncSession, user_id: int, task_data: TaskCreate) -> 
     await db.refresh(task)
 
     logger.info(f"Задача создана с id={task.id}")
+    tasks_created_total.inc()
     return task
 
 

@@ -15,6 +15,7 @@ from app.infrastructure.db.get_db import get_db
 from app.api.deps.auth import get_current_user
 from app.infrastructure.db.models.user import User
 from app.infrastructure.fetchers.exception import FetcherError
+from app.metrics.tasks import tasks_failed_total
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
@@ -30,6 +31,7 @@ async def api_create_task(
         task = await create_task(db, user_id=current_user.id, task_data=task_data)
     except FetcherError as e:
         logger.error(f'failed create task: {e}')
+        tasks_failed_total.inc() 
         raise HTTPException(
             status_code=400,
             detail=str(e),
@@ -79,6 +81,7 @@ async def api_update_task(
         updated_task = await update_task(db, task, updates)
     except FetcherError as e:
         logger.error(f'failed update task: {e}')
+        tasks_failed_total.inc()
         raise HTTPException(
             status_code=400,
             detail=str(e),

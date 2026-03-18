@@ -11,6 +11,7 @@ from app.infrastructure.db.models.task import Task
 from app.infrastructure.db.session import AsyncSessionLocal
 from app.infrastructure.fetchers.exception import ClientError, SSLError
 from app.services.monitoring.monitoring import run_task
+from app.metrics.tasks import tasks_executed_total, tasks_ready_total
 
 
 scheduler = AsyncIOScheduler()
@@ -36,6 +37,8 @@ async def execute_task(task_id: int) -> None:
             task.schedule_next_run()
 
             await db.commit()
+
+            tasks_executed_total.inc()
 
             duration = (datetime.now(timezone.utc) - start_time).total_seconds()
             logger.info(f"Task {task.id} finished in {duration:.2f}s")
@@ -96,6 +99,8 @@ async def check_tasks() -> None:
         )
 
         tasks = result.scalars().all()
+
+        tasks_ready_total.set(len(tasks))
 
         if not tasks:
             logger.debug("Scheduler tick: no tasks ready")

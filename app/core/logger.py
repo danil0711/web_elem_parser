@@ -45,3 +45,4 @@ class InterceptHandler(logging.Handler):
 
 # Подключаем перехватчик
 logging.basicConfig(handlers=[InterceptHandler()], level=logging.INFO)
+logging.getLogger("apscheduler").setLevel(logging.WARNING)

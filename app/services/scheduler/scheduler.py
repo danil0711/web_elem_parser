@@ -13,62 +13,84 @@ from app.services.monitoring.monitoring import run_task
 
 scheduler = AsyncIOScheduler()
 
+semaphore = asyncio.Semaphore(20)
+
 
 async def execute_task(task_id: int) -> None:
+    start_time = datetime.now(timezone.utc)
+
     async with AsyncSessionLocal() as db:
-        task = await db.get(Task, task_id)
-
-        if not task or not task.is_active:
-            return
-
         try:
-            await run_task(db, task)
+            task = await db.get(Task, task_id)
 
-            task.last_run_at = datetime.now(timezone.utc)
+            if not task or not task.is_active:
+                logger.debug(f"Task {task_id} skipped")
+                return
+
+            logger.info(f"Task {task.id} started")
+
+            await run_task(task)
+
+            task.schedule_next_run()
 
             await db.commit()
 
+            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+            logger.info(f"Task {task.id} finished in {duration:.2f}s")
+
         except Exception:
             await db.rollback()
-
-            logger.exception("Task execution failed")
-
+            logger.exception(f"Task {task_id} execution failed")
 
 async def check_tasks() -> None:
-    """
-    Проверяет задачи и запускает те, которые должны выполниться.
-    """
-
-
+    tick_start = datetime.now(timezone.utc)
+    logger.debug("Scheduler tick started")
     async with AsyncSessionLocal() as db:
         now = datetime.now(timezone.utc)
 
-        result = await db.execute(select(Task).where(Task.is_active))
+        result = await db.execute(
+            select(Task)
+            .where(
+                Task.is_active.is_(True),
+                Task.next_run_at <= now,
+            )
+            .limit(500)
+            .with_for_update(skip_locked=True)
+        )
 
         tasks = result.scalars().all()
 
+        if not tasks:
+            logger.debug("Scheduler tick: no tasks ready")
+            return
+        
+        logger.info(f"Scheduler fetched {len(tasks)} tasks")
 
-        to_run = []
 
         for task in tasks:
-            if task.should_run(now):
-                to_run.append(task.id)
+            logger.debug(f"Queueing task {task.id}")
+            asyncio.create_task(run_with_limit(task.id))
 
-        logger.info(
-            f"Tasks to run: {len(to_run)}",
-        )
+        duration = (datetime.now(timezone.utc) - tick_start).total_seconds()
+        logger.debug(f"Scheduler tick finished in {duration:.2f}s")
 
-        for task_id in to_run:
-            asyncio.create_task(execute_task(task_id))
 
+async def run_with_limit(task_id: int):
+    logger.debug(f"Waiting semaphore for task {task_id}")
+    async with semaphore:
+        logger.debug(f"Semaphore acquired for task {task_id}")
+        await execute_task(task_id)
 
 def start_scheduler() -> None:
 
     logger.info("Scheduler started")
 
+    logger.info("Scheduler config: interval=5s, limit=500, concurrency=20")
+
+
     scheduler.add_job(
         check_tasks,
-        IntervalTrigger(minutes=1),
+        IntervalTrigger(seconds=5),
         max_instances=1,
         next_run_time=datetime.now(timezone.utc)
     )

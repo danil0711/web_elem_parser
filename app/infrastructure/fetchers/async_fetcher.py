@@ -1,6 +1,7 @@
-import asyncio
 import httpx
+
 from app.infrastructure.fetchers.base import AsyncFetcher
+from app.infrastructure.fetchers.exception import ClientError, SSLError
 from app.infrastructure.http.client import http_client
 
 
@@ -12,27 +13,28 @@ class HttpxAsyncFetcher(AsyncFetcher):
     def __init__(
         self,
         client: httpx.AsyncClient,
-        max_retries: int = 3,
     ):
         self.client = client
-        self.max_retries = max_retries
 
+    
     async def fetch(self, url: str) -> str:
-        attempt = 0
+        try:
+            response = await self.client.get(url)
+            response.raise_for_status()
+            return response.text
 
-        while attempt < self.max_retries:
-            try:
-                response = await self.client.get(url)
-                response.raise_for_status()
-                return response.text
+        except httpx.ConnectError as e:
+            if "CERTIFICATE_VERIFY_FAILED" in str(e):
+                raise SSLError from e
+            raise ConnectionError(str(e)) from e
 
-            except (httpx.RequestError, httpx.HTTPStatusError) as e:
-                attempt += 1
-                backoff = 2**attempt
-                await asyncio.sleep(backoff)
+        except httpx.HTTPStatusError as e:
+            status = e.response.status_code
 
-                if attempt >= self.max_retries:
-                    raise
+            if 400 <= status < 500:
+                raise ClientError(f"HTTP {status}") from e
+
+            raise
 
 
 fetcher = HttpxAsyncFetcher(http_client)
